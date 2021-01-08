@@ -15,7 +15,7 @@
 
 '''
 ################### USER GUIDE ###################
-FANTASY is a geodesic integration code for arbitrary metrics with automatic differentiation. Please refer to Christian and Chan, 2020 for details.
+FANTASY is a geodesic integration code for arbitrary metrics with automatic differentiation. Please refer to Christian and Chan, 2021 for details.
 
 ################### Inputing the Metric ###################
 Components of the metric are stored in the functions g00, g01, g02, etc that can be found under the heading "Metric Components". Each of these take as input a list called Param, which contains the fixed parameters of the metric (e.g., 'M' and 'a' for the Kerr metric in Boyer-Lindquist coordinates) and a list called Coord, which contains the coordinates (e.g., 'r' and 't' for the Kerr metric in Boyer-Lindquist coordinates). In order to set up a metric,
@@ -59,6 +59,10 @@ output[timestep][3] = a list containing the momentum of the particle at said tim
 
 As long as the equation of motion is integrable (see section "A Guide on Choosing omega"), the trajectories in the two phase spaces will quickly converge, and you can choose either one as the result of your calculation.
 
+################### Automatic Jacobian ###################
+
+Input coordinate transformations for the 0th, 1st, 2nd, 3rd coordinate in functions CoordTrans0, CoordTrans1, CoordTrans2, CoordTrans3. As an example, coordinate transformation from Spherical Schwarzschild to Cartesian Schwarzschild has been provided.
+
 '''
 
 ################### Code Preamble ###################
@@ -66,7 +70,7 @@ As long as the equation of motion is integrable (see section "A Guide on Choosin
 from pylab import *
 from scipy import special
 import numpy
-
+from IPython.display import clear_output, display
 
 class dual:
   def __init__(self, first, second):
@@ -144,14 +148,6 @@ def dif(func,x):
     else:
         ''' this is for when the function is a constant, e.g. gtt:=0 '''
         return 0
-
-def dualtest(dual1,dual2):
-    x = dual(dual1[0],dual1[1])
-    y = dual(dual2[0],dual2[1])
-    return 2.*x
-
-def diftest(x):
-    return dif(lambda y:cos(y)**2,x)
 
 ################### Metric Components ###################
 
@@ -316,6 +312,101 @@ def dm(Param,Coord,metric,wrt):
         elif wrt == 3:
             return dif(lambda p:g23(Param,[point_0,point_1,point_2,p]),point_d)
 
+################### Automatic Coordinate Transformation ###################
+
+def CoordTrans0(Param, Coord):
+
+    M = Param[0]
+    a = Param[1]
+    t = Coord[0]
+    
+    return t
+        
+def CoordTrans1(Param, Coord):
+
+    M = Param[0]
+    a = Param[1]
+    r = Coord[1]
+    theta = Coord[2]
+    phi = Coord[3]
+    
+    x = r*sin(theta)*cos(phi)
+
+    return x
+
+def CoordTrans2(Param, Coord):
+
+    M = Param[0]
+    a = Param[1]
+    r = Coord[1]
+    theta = Coord[2]
+    phi = Coord[3]
+    
+    y = r*sin(theta)*sin(phi)
+
+    return y
+
+def CoordTrans3(Param, Coord):
+
+    M = Param[0]
+    a = Param[1]
+    r = Coord[1]
+    theta = Coord[2]
+    
+    z = r*cos(theta)
+
+    return z
+
+def AutoJacob(Param,Coord,i,wrt):
+    
+    point_d = Coord[wrt]
+
+    point_0 = dual(Coord[0],0)
+    point_1 = dual(Coord[1],0)
+    point_2 = dual(Coord[2],0)
+    point_3 = dual(Coord[3],0)
+
+    if i == 0:
+        if wrt == 0:
+            return dif(lambda p:CoordTrans0(Param,[p,point_1,point_2,point_3]),point_d)
+        elif wrt == 1:
+            return dif(lambda p:CoordTrans0(Param,[point_0,p,point_2,point_3]),point_d)
+        elif wrt == 2:
+            return dif(lambda p:CoordTrans0(Param,[point_0,point_1,p,point_3]),point_d)
+        elif wrt == 3:
+            return dif(lambda p:CoordTrans0(Param,[point_0,point_1,point_2,p]),point_d)
+
+    if i == 1:
+        if wrt == 0:
+            return dif(lambda p:CoordTrans1(Param,[p,point_1,point_2,point_3]),point_d)
+        elif wrt == 1:
+            return dif(lambda p:CoordTrans1(Param,[point_0,p,point_2,point_3]),point_d)
+        elif wrt == 2:
+            return dif(lambda p:CoordTrans1(Param,[point_0,point_1,p,point_3]),point_d)
+        elif wrt == 3:
+            return dif(lambda p:CoordTrans1(Param,[point_0,point_1,point_2,p]),point_d)
+
+    if i == 2:
+        if wrt == 0:
+            return dif(lambda p:CoordTrans2(Param,[p,point_1,point_2,point_3]),point_d)
+        elif wrt == 1:
+            return dif(lambda p:CoordTrans2(Param,[point_0,p,point_2,point_3]),point_d)
+        elif wrt == 2:
+            return dif(lambda p:CoordTrans2(Param,[point_0,point_1,p,point_3]),point_d)
+        elif wrt == 3:
+            return dif(lambda p:CoordTrans2(Param,[point_0,point_1,point_2,p]),point_d)
+
+    if i == 3:
+        if wrt == 0:
+            return dif(lambda p:CoordTrans3(Param,[p,point_1,point_2,point_3]),point_d)
+        elif wrt == 1:
+            return dif(lambda p:CoordTrans3(Param,[point_0,p,point_2,point_3]),point_d)
+        elif wrt == 2:
+            return dif(lambda p:CoordTrans3(Param,[point_0,point_1,p,point_3]),point_d)
+        elif wrt == 3:
+            return dif(lambda p:CoordTrans3(Param,[point_0,point_1,point_2,p]),point_d)
+    
+        
 ################### Integrator ###################
 
 def Hamil_inside(q,p,Param,wrt):
@@ -399,18 +490,22 @@ def geodesic_integrator(N,delta,omega,q0,p0,Param,order=2):
     p1=p0
     p2=p0
 
-    result_list = []
+    result_list = [[q1,p1,q2,p2]]
     result = (q1,p1,q2,p2)
 
     for count, timestep in enumerate(range(N)):
         if order == 2:
-            print('Integration order = 2')
             updated_array = updator(delta,omega,result[0],result[1],result[2],result[3],Param)
         elif order == 4:
-            print('Integration order = 4')
             updated_array = updator_4(delta,omega,result[0],result[1],result[2],result[3],Param)
 
         result = updated_array
         result_list += [result]
+        
+        if not count%1000:
+            clear_output(wait=True)
+            display('On iteration number '+str(count) + ' with delta ' + str(delta))
+        
+
 
     return result_list
